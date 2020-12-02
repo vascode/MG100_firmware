@@ -134,7 +134,7 @@ int GetFSFree()
 		}
 	}
 
-	LOG_INF("Free Space = %d MB", Ret);
+	// LOG_INF("Free Space = %d MB", Ret); //BK
 
 	return (Ret);
 }
@@ -167,7 +167,7 @@ int GetLogSize()
 		Ret = (LogSize / B_PER_MB) + 1;
 	}
 
-	LOG_INF("Current Log Size = %d MB", Ret);
+	// LOG_INF("Current Log Size = %d MB", Ret); //BK
 
 	return (Ret);
 }
