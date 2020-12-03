@@ -12,8 +12,6 @@
 8. **[Development](#development)**
 9. **[Change source code](#change-source-code)**
 
-[Programming Guide](https://www.lairdconnect.com/documentation/user-guide-programming-mg100) 
-
 ## Introduction
 
 This page is derived from https://github.com/LairdCP/MG100_firmware which is about MG100's LTE-M demo to work with Laird BLE sensors such as BT510 and BME280. The source code is modified here so that MG100 can detect BLE advert data from BeckettLink Tank Guage and push the data to AWS IoT account. 
