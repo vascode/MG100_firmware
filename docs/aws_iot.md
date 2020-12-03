@@ -55,13 +55,17 @@ Finally click Create.
 
 ### Create a Thing
 
+Create two Thing - one for MG100 and one for end-device (e.g. BLE sensor) 
+
+#### Create a Thing for MG100
+
 In the left-hand menu, navigate to Manage -> Things and click Create on the far right.
 
 Click Create a single thing.
 
-Enter a name and click Next.
+Enter a name in format of 'deviceId-<imei>' where '<imei>' your SIM card IMEI number 
 
-![Thing Name](images/aws/thing_name.png)  
+![Thing Name](images/aws/thing_registry.png)  
 *Thing Name*
 
 Create a certificate using the One-click certificate creation by clicking Create certificate.
@@ -80,6 +84,20 @@ Select the policy that was created previously and click Register Thing.
 
 ![Attach Policy](images/aws/attach_policy.png)  
 *Attach Policy*
+
+#### Create a Thing for end-device
+
+Repeat the process as above but this time skip creating certification
+
+Click Create a single thing and Enter MAC address for the name.
+
+![Thing Name for end-device](images/aws/thing_registry_end_device.png)  
+*Thing Name for end-device*
+
+Skip certification on the next page
+
+![Skip certification](images/aws/skip_certification.png)  
+*Skip certification*
 
 ## Configure MG100 for AWS Connection
 
