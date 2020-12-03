@@ -29,6 +29,7 @@ extern "C" {
 #define SENSOR_NAME_MAX_STR_LEN (SENSOR_NAME_MAX_SIZE - 1)
 
 #define LAIRD_CONNECTIVITY_MANUFACTURER_SPECIFIC_COMPANY_ID1 0x0077
+#define BECKETT_MANUFACTURER_SPECIFIC_COMPANY_ID1 0x061A // BK
 #define LAIRD_CONNECTIVITY_MANUFACTURER_SPECIFIC_COMPANY_ID2 0x00E4
 
 /* clang-format off */
@@ -65,6 +66,15 @@ struct Bt510AdEvent {
 	uint8_t resetCount;
 } __packed;
 typedef struct Bt510AdEvent Bt510AdEvent_t;
+
+// BK - data format
+struct BKAdEvent {
+	uint16_t companyId;
+	uint8_t rwb;
+	uint16_t tank;
+	uint16_t battery;
+} __packed;
+typedef struct BKAdEvent BKAdEvent_t;
 
 /* Format of the response payload for 1M PHY.
  * This is the second chunk of the extended advertisement data
@@ -107,6 +117,10 @@ typedef struct Bt510Coded Bt510Coded_t;
 BUILD_ASSERT(sizeof(Bt510AdEvent_t) == BT510_MSD_AD_PAYLOAD_LENGTH,
 	     "BT510 Advertisement data size mismatch (check packing)");
 
+#define BK_MSD_AD_FIELD_LENGTH 0x07 //BK
+#define BK_MSD_AD_PAYLOAD_LENGTH                                               \
+	(BK_MSD_AD_FIELD_LENGTH - 1) //BK : exclude 1 byte for type FF
+
 #define BT510_MSD_RSP_FIELD_LENGTH 0x10
 #define BT510_MSD_RSP_PAYLOAD_LENGTH (BT510_MSD_RSP_FIELD_LENGTH - 1)
 BUILD_ASSERT(sizeof(Bt510RspWithHeader_t) == BT510_MSD_RSP_PAYLOAD_LENGTH,
@@ -125,6 +139,7 @@ BUILD_ASSERT(sizeof(Bt510Coded_t) == BT510_MSD_CODED_PAYLOAD_LENGTH,
 extern const uint8_t BT510_AD_HEADER[SENSOR_AD_HEADER_SIZE];
 extern const uint8_t BT510_RSP_HEADER[SENSOR_AD_HEADER_SIZE];
 extern const uint8_t BT510_CODED_HEADER[SENSOR_AD_HEADER_SIZE];
+extern const uint8_t BK_AD_HEADER[2];
 
 #ifdef __cplusplus
 }

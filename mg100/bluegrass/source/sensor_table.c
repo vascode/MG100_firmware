@@ -92,10 +92,13 @@ typedef struct SensorEntry {
 	bool validRsp;
 	bool updatedName;
 	bool updatedRsp;
+	bool bkFlag; //BK
+	uint64_t bkTime; //BK
 	char name[SENSOR_NAME_MAX_SIZE];
 	char addrString[SENSOR_ADDR_STR_SIZE];
 	Bt510AdEvent_t ad;
 	Bt510Rsp_t rsp;
+	BKAdEvent_t bkAd; //BK
 	int8_t rssi;
 	uint8_t lastRecordType;
 	uint32_t rxEpoch;
@@ -137,6 +140,7 @@ static void FreeCmdBuffers(SensorEntry_t *pEntry);
 static void FreeEntryBuffers(SensorEntry_t *pEntry);
 
 static bool FindBt510Advertisement(AdHandle_t *pHandle);
+static bool FindBKAdvertisement(AdHandle_t *pHandle); //BK
 static bool FindBt510ScanResponse(AdHandle_t *pHandle);
 static bool FindBt510CodedAdvertisement(AdHandle_t *pHandle);
 
@@ -149,12 +153,14 @@ static void AddEntry(SensorEntry_t *pEntry, const bt_addr_t *pAddr,
 static size_t FindTableIndex(const bt_addr_le_t *pAddr);
 static size_t FindFirstFree(void);
 static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index);
+static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index); //BK
 
 static bool AddrMatch(const void *p, size_t Index);
 static bool AddrStringMatch(const char *str, size_t Index);
 static bool NameMatch(const char *p, size_t Index);
 static bool RspMatch(const Bt510Rsp_t *p, size_t Index);
 static bool NewEvent(uint16_t Id, size_t Index);
+static bool BkNewEvent(size_t Index); //BK
 
 static void SensorAddrToString(SensorEntry_t *pEntry);
 static bt_addr_t BtAddrStringToStruct(const char *pAddrString);
@@ -186,6 +192,8 @@ static void CreateConfigRequest(SensorEntry_t *pEntry);
 static uint32_t GetFlag(uint16_t Value, uint32_t Mask, uint8_t Position);
 
 static void PublishToGetAccepted(SensorEntry_t *pEntry);
+static void ShadowBkAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry);
+static void BkShadowMaker(SensorEntry_t *pEntry);
 
 /******************************************************************************/
 /* Global Function Definitions                                                */
@@ -198,6 +206,7 @@ void SensorTable_Initialize(void)
 	pLte = lteGetStatus();
 }
 
+/* Is the advert from BT510 or BK? */
 bool SensorTable_MatchBt510(struct net_buf_simple *ad)
 {
 	AdHandle_t manHandle = AdFind_Type(
@@ -211,6 +220,9 @@ bool SensorTable_MatchBt510(struct net_buf_simple *ad)
 	}
 
 	if (FindBt510Advertisement(&manHandle)) {
+		return true;
+	}
+	if (FindBKAdvertisement(&manHandle)) { //BK - advert from BK?
 		return true;
 	}
 
@@ -267,6 +279,28 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 			Bt510AdEvent_t *pAd =
 				(Bt510AdEvent_t *)manHandle.pPayload;
 			AdEventHandler(pAd, rssi, tableIndex);
+		}
+	}
+
+	if (FindBKAdvertisement(&manHandle)) { //BK - advert from BK?
+		size_t tableIndex = FindTableIndex(pAddr);
+		if (tableIndex <
+		    CONFIG_SENSOR_TABLE_SIZE) { //if already in table
+			FRAMEWORK_DEBUG_ASSERT(
+				memcmp(sensorTable[tableIndex]
+					       .ad.addr
+					       .val, //double check if BK's MAC matches
+				       pAddr->a.val, sizeof(bt_addr_t)) == 0);
+		} else {
+			/* Try to populate table with sensor (without name and scan rsp) */
+			tableIndex = AddByAddress(&pAddr->a);
+		}
+
+		if (tableIndex < CONFIG_SENSOR_TABLE_SIZE) {
+			BKAdEvent_t *pBkAd =
+				(BKAdEvent_t *)
+					manHandle.pPayload; // data after 'FF'
+			BkAdEventHandler(pBkAd, rssi, tableIndex);
 		}
 	}
 
@@ -544,8 +578,9 @@ void SensorTable_ProcessShadowInitMsg(SensorShadowInitMsg_t *pMsg)
 		}
 		p->pLog = SensorLog_Allocate(CONFIG_SENSOR_LOG_MAX_SIZE);
 		for (i = 0; i < pMsg->eventCount; i++) {
-			FRAMEWORK_ASSERT(pMsg->events[i].epoch != 0);
-			SensorLog_Add(p->pLog, &pMsg->events[i]);
+			if (pMsg->events[i].epoch != 0) {
+				SensorLog_Add(p->pLog, &pMsg->events[i]);
+			}
 		}
 	}
 }
@@ -676,6 +711,7 @@ static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index)
 		LOG_DBG("New Event for [%u] '%s' (%s) RSSI: %d", Index,
 			log_strdup(sensorTable[Index].name),
 			log_strdup(sensorTable[Index].addrString), Rssi);
+
 		sensorTable[Index].lastRecordType =
 			sensorTable[Index].ad.recordType;
 		memcpy(&sensorTable[Index].ad, p, sizeof(Bt510AdEvent_t));
@@ -685,6 +721,30 @@ static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index)
 		ShadowMaker(&sensorTable[Index]);
 
 		sdCardLogAdEvent(p);
+
+		/* The cloud uses the RX epoch (in the table) for filtering. */
+		GatewayShadowMaker(false);
+	}
+}
+/* AdEventHandler for BK - copy BK advert data to table */
+static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index) //BK
+{
+	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
+	sensorTable[Index].bkFlag = true;
+	// sensorTable[Index].whitelisted = true;
+
+	if (BkNewEvent(Index)) {
+		sensorTable[Index].validAd = true;
+		sensorTable[Index].validRsp = true;
+		LOG_DBG("New Event for [%u] '%s' (%s) RSSI: %d", Index,
+			log_strdup(sensorTable[Index].name),
+			log_strdup(sensorTable[Index].addrString), Rssi);
+
+		memcpy(&sensorTable[Index].bkAd, p, sizeof(BKAdEvent_t));
+		sensorTable[Index].rssi = Rssi;
+		/* If event occurs before epoch is set, then AWS shows ~1970. */
+		sensorTable[Index].rxEpoch = Qrtc_GetEpoch();
+		BkShadowMaker(&sensorTable[Index]);
 
 		/* The cloud uses the RX epoch (in the table) for filtering. */
 		GatewayShadowMaker(false);
@@ -701,6 +761,20 @@ static bool FindBt510Advertisement(AdHandle_t *pHandle)
 		if ((pHandle->size == BT510_MSD_AD_PAYLOAD_LENGTH)) {
 			if (memcmp(pHandle->pPayload, BT510_AD_HEADER,
 				   sizeof(BT510_AD_HEADER)) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+/* Check if the advert is from BK by checking payload length and company ID */
+static bool FindBKAdvertisement(AdHandle_t *pHandle) //BK
+{
+	if (pHandle->pPayload != NULL) {
+		if ((pHandle->size == BK_MSD_AD_PAYLOAD_LENGTH)) {
+			if (memcmp(pHandle->pPayload,
+				   BK_AD_HEADER, // company ID matching?
+				   sizeof(BK_AD_HEADER)) == 0) {
 				return true;
 			}
 		}
@@ -871,6 +945,19 @@ static bool NewEvent(uint16_t Id, size_t Index)
 		return (Id != sensorTable[Index].ad.id);
 	}
 }
+/* NewEvent for BK - interval for two BkNewEvent should be no less than 30 seconds */
+static bool BkNewEvent(size_t Index) //BK
+{
+	if (!sensorTable[Index].validAd) {
+		return true;
+	} else if (sensorTable[Index].bkTime < k_uptime_get()) {
+		sensorTable[Index].bkTime =
+			k_uptime_get() + (30 * MSEC_PER_SEC);
+		return true;
+	}
+
+	return false;
+}
 
 static void ShadowMaker(SensorEntry_t *pEntry)
 {
@@ -909,6 +996,55 @@ static void ShadowMaker(SensorEntry_t *pEntry)
 		ShadowRspHandler(pMsg, pEntry);
 		ShadowLogHandler(pMsg, pEntry);
 		ShadowSpecialHandler(pMsg, pEntry);
+	}
+	ShadowBuilder_EndGroup(pMsg);
+	ShadowBuilder_EndGroup(pMsg);
+	ShadowBuilder_Finalize(pMsg);
+
+	/* The part of the topic that changes must match
+	 * the format of the address field generated by ShadowGatewayMaker.
+	 */
+	char *fmt = SENSOR_UPDATE_TOPIC_FMT_STR;
+	snprintk(pMsg->topic, CONFIG_AWS_TOPIC_MAX_SIZE, fmt,
+		 pEntry->addrString);
+
+	FRAMEWORK_MSG_SEND(pMsg);
+}
+
+static void BkShadowMaker(SensorEntry_t *pEntry)
+{
+	/* AWS will disconnect if data is sent for devices that have not
+	 * been whitelisted.
+	 */
+	if (!CONFIG_USE_SINGLE_AWS_TOPIC) {
+		if (!pEntry->whitelisted || !pEntry->shadowInitReceived) {
+			return;
+		}
+	}
+
+	JsonMsg_t *pMsg = BufferPool_Take(
+		FWK_BUFFER_MSG_SIZE(JsonMsg_t, SHADOW_BUF_SIZE));
+	if (pMsg == NULL) {
+		return;
+	}
+
+	pMsg->header.msgCode = FMC_SENSOR_PUBLISH;
+	pMsg->header.rxId = FWK_ID_CLOUD;
+	pMsg->size = SHADOW_BUF_SIZE;
+
+	ShadowBuilder_Start(pMsg, SKIP_MEMSET);
+	ShadowBuilder_StartGroup(pMsg, "state");
+	ShadowBuilder_StartGroup(pMsg, "reported");
+	if (CONFIG_USE_SINGLE_AWS_TOPIC) {
+		ShadowTemperatureHandler(pMsg, pEntry);
+		/* Sending RSSI prevents an empty buffer when
+		 * temperature isn't present.
+		 */
+		ShadowBuilder_AddSigned32(pMsg, MangleKey(pEntry->name, "rssi"),
+					  pEntry->rssi);
+	} else {
+		ShadowBtHandler(pMsg, pEntry);	//shadow for BT MAC and RSSI 
+		ShadowBkAdHandler(pMsg, pEntry); //shadow for payload (RWB, tank, battery)
 	}
 	ShadowBuilder_EndGroup(pMsg);
 	ShadowBuilder_EndGroup(pMsg);
@@ -968,6 +1104,17 @@ static void ShadowAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
 	ShadowEventHandler(pMsg, pEntry);
 	ShadowFlagHandler(pMsg, pEntry);
 	ShadowIg60EventHandler(pMsg, pEntry);
+}
+
+static void ShadowBkAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
+{
+	if (!pEntry->validAd) {
+		return;
+	}
+
+	ShadowBuilder_AddUint32(pMsg, "RWB", pEntry->bkAd.rwb);
+	ShadowBuilder_AddUint32(pMsg, "tank", pEntry->bkAd.tank);
+	ShadowBuilder_AddUint32(pMsg, "battery", pEntry->bkAd.battery);
 }
 
 /**
