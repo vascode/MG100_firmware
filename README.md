@@ -12,10 +12,6 @@
 8. **[Development](#development)**
 9. **[Change source code](#change-source-code)**
 
-Firmware build 
-* UART
-* SWD (Serial Wire Debug) 
-
 [Programming Guide](https://www.lairdconnect.com/documentation/user-guide-programming-mg100) 
 
 ## Introduction
@@ -36,7 +32,7 @@ Firmware can be flashed through UART, BLE or SWD (Serial Wire Debug)
 
 ## Use binary for demo
 
-<place holder> way to provide binary and use command like in https://github.com/LairdCP/MG100_firmware/releases? 
+(place holder) a way to provide binary and use command like in https://github.com/LairdCP/MG100_firmware/releases? 
   
 ## Clone firmware source
 
@@ -133,7 +129,7 @@ See [here](docs/firmware_update.md) for building firmware via UART or BLE
 
 ## Connect to AWS account 
 
-Read [here](docs/aws_iot.md) 
+Read [here](docs/aws_iot.md) where you will set up AWS account and set its address in MG100 so that you can see data coming in from either BT510 or Beckett device 
 
 ## Development
 
