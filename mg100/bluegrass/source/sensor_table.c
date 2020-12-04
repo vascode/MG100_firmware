@@ -706,6 +706,8 @@ static void FreeEntryBuffers(SensorEntry_t *pEntry)
 static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index)
 {
 	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
+	sensorTable[Index].whitelisted = true; //automatically whitelisted to simplify the demo process
+	
 	if (NewEvent(p->id, Index)) {
 		sensorTable[Index].validAd = true;
 		LOG_DBG("New Event for [%u] '%s' (%s) RSSI: %d", Index,
@@ -731,7 +733,7 @@ static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index) //BK
 {
 	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
 	sensorTable[Index].bkFlag = true;
-	// sensorTable[Index].whitelisted = true;
+	sensorTable[Index].whitelisted = true; //automatically whitelisted to simplify the demo process
 
 	if (BkNewEvent(Index)) {
 		sensorTable[Index].validAd = true;
