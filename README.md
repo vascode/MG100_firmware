@@ -30,8 +30,16 @@ Firmware can be flashed through UART, BLE or SWD (Serial Wire Debug)
 
 ## Use binary for demo
 
-(place holder) a way to provide binary and use command like in https://github.com/LairdCP/MG100_firmware/releases? 
-  
+To just upload binary file via SWD without building, download [merged.hex](https://rfpros.sharepoint.com/:u:/s/share01/support/EXmSR0Fm4oZDk2XxAZGBVE8B8eEYTu8_6IFVt3wOQJX-jA?e=vIz20g) and use the command : 
+
+```
+nrfjprog -f NRF52 --program merged.hex --chiperase --reset
+```
+
+If you just upload binary file via UART without building, download [app_update.bin](https://rfpros.sharepoint.com/:u:/s/share01/support/EdUFf4u-3NBNnXmQqfLht-cBZMJlYJ9o1V2lfh4v2qTvgA?e=Mw4sh1) and follow instruction [here](docs/firmware_update.md). 
+
+
+
 ## Clone firmware source
 
 This is a Zephyr `west` manifest repository. To learn more about `west` see [here](https://docs.zephyrproject.org/latest/guides/west/index.html).
