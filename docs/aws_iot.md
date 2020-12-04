@@ -63,7 +63,7 @@ In the left-hand menu, navigate to Manage -> Things and click Create on the far 
 
 Click Create a single thing.
 
-Enter a name in format of 'deviceId-<imei>' where '<imei>' your SIM card IMEI number 
+Enter a name in format of `deviceId-<imei>` where `<imei>` your SIM card's IMEI number inserted in MG100 
 
 ![Thing Name](images/aws/thing_registry.png)  
 *Thing Name*
