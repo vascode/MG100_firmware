@@ -68,7 +68,8 @@ Enter a name in format of `deviceId-<imei>` where `<imei>` your SIM card's IMEI 
 ![Thing Name](images/aws/thing_registry.png)  
 *Thing Name*
 
-Create a certificate using the One-click certificate creation by clicking Create certificate.
+
+Create a certificate using the One-click certificate creation by clicking Create certificate. (This is optional and you can choose Skip Certification)
 
 ![Create Cert](images/aws/create_cert.png)  
 *Create Cert*
@@ -87,14 +88,14 @@ Select the policy that was created previously and click Register Thing.
 
 #### Create a Thing for end-device
 
-Repeat the process as above but this time skip creating certification
+Repeat the process as above for creating a Thing for end-device 
 
 Click Create a single thing and Enter MAC address for the name.
 
 ![Thing Name for end-device](images/aws/thing_registry_end_device.png)  
 *Thing Name for end-device*
 
-Skip certification on the next page
+Skip certification on the next page (You can create certication if you want to)
 
 ![Skip certification](images/aws/skip_certification.png)  
 *Skip certification*
@@ -168,5 +169,16 @@ With the AWS IoT console, you can watch for MQTT data sent by the device. Got to
 
 In Subscription topic, enter `$aws/things/deviceId-<my_imei>/shadow/update` where `<my_imei>` is replaced by the imei of your device. Then click Subscribe to topic. JSON data will be displayed once the MG100 sends data.
 
-![MQTT Data](images/aws/mqtt_data.png)  
-*MQTT Data*
+![MQTT Data from MG100](images/aws/mqtt_data_mg100.png)  
+*MQTT Data from MG100*
+
+Similarly, in Subscription topic, enter `$aws/things/<MAC_address>/shadow/update` where `<MAC_address>` is BLE device's MAC address. 
+Data from Beckett device : 
+
+![MQTT Data from Beckett device](images/aws/mqtt_data_bk.png)  
+*MQTT Data from Beckett device*
+
+Data from BT510 : 
+
+![MQTT Data from BT510](images/aws/mqtt_data_bt510.png)  
+*MQTT Data from BT510*
