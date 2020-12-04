@@ -143,6 +143,6 @@ Details on the BLE profiles used to interface with the mobile app can be found [
 
 To add your own BLE sensor for this demo, your own data format needs to be defined first and it sould be added to SensorTable. Also your own advert event hanlder needs to be created. Take a look at [this commit](https://github.com/vascode/MG100_firmware/commit/dd6405617c2779fe9539834c67d529bfac36b715) to see what's added from the original code.  For example, 
 * BKAdEvent_t : BeckettLink Tank Gauge's data structure in advert. This is added to SensorEntry_t for SensorTable in sensor_table.c
-* FindBKAdvertisement : Check if the advert is from BK by checking payload length and company ID
-* BkAdEventHandler : copy BK advert data to Sensortable
+* FindBKAdvertisement : Check if the advert is from Beckett by checking payload length and company ID
+* BkAdEventHandler : copy Beckett advert data to Sensortable
 * BkShadowMaker : Prepare shadow in json by referring data in SensorTable
