@@ -7,7 +7,7 @@
 3. **[Use binary for demo](#use-binary-for-demo)**
 4. **[Clone firmware source](#clone-firmware-source)**
 5. **[Build firmware](#build-firmware)**
-6. **[Flash firmware](#flash-firmware)**
+6. **[Update firmware](#update-firmware)**
 7. **[Connect to AWS account](#connect-to-aws-account)**
 8. **[Development](#development)**
 9. **[Change source code](#change-source-code)**
@@ -100,7 +100,7 @@ cp ../modules/zephyr_lib/mcuboot_config/pm_static.pinnacle100.yml mg100/pm_stati
 copy ..\modules\zephyr_lib\mcuboot_config\pm_static.pinnacle100.yml mg100\pm_static.yml && west build -b mg100 -d build\mg100_aws mg100 -- -DOVERLAY_CONFIG="%CD%\..\modules\zephyr_lib\mcumgr_wrapper\config\overlay-mcuboot.conf" -Dmcuboot_CONF_FILE="%CD%\..\modules\zephyr_lib\mcuboot_config\mcuboot-qspi.conf %CD%\..\modules\zephyr_lib\mcuboot_config\overlay-disable-hl7800-modem.conf %CD%\..\modules\zephyr_lib\mcuboot_config\mcuboot-serial-pinnacle100_dvk.conf %CD%\..\modules\zephyr_lib\mcuboot_config/disable-slot0-validate.conf"
 ```
 
-## Flash firmware
+## Update firmware
 
 If the MG100 is running v2.0.0 firmware or earlier, firmmare updates must be programmed via SWD(Serial Wire Debug). To do this, consult the [MG100 Hardware Guide](https://www.lairdconnect.com/documentation/mg100-gateway-hardware-guide) section 5.4.4 to learn how to connect a J-Link debugger to the board.
 
