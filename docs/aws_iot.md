@@ -175,8 +175,8 @@ In Subscription topic, enter `$aws/things/deviceId-<my_imei>/shadow/update` wher
 Similarly, in Subscription topic, enter `$aws/things/<MAC_address>/shadow/update` where `<MAC_address>` is BLE device's MAC address. 
 Data from Beckett device : 
 
-![MQTT Data from Beckett device](images/aws/mqtt_data_bk.png)  
-*MQTT Data from Beckett device*
+![MQTT Data from Beckett device](images/aws/mqtt_data_att.png)  
+*MQTT Data from AT&T device*
 
 Data from BT510 : 
 
