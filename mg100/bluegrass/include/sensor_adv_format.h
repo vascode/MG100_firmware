@@ -77,7 +77,6 @@ struct AttAdEvent {
 	uint8_t qd;
 	uint8_t dc;
 	uint8_t rf;
-	uint8_t extra;
 	int16_t rpm;
 } __packed;
 typedef struct AttAdEvent AttAdEvent_t;
@@ -123,7 +122,7 @@ typedef struct Bt510Coded Bt510Coded_t;
 BUILD_ASSERT(sizeof(Bt510AdEvent_t) == BT510_MSD_AD_PAYLOAD_LENGTH,
 	     "BT510 Advertisement data size mismatch (check packing)");
 
-#define ATT_MSD_AD_FIELD_LENGTH 0x11
+#define ATT_MSD_AD_FIELD_LENGTH 0x10
 #define ATT_MSD_AD_PAYLOAD_LENGTH (ATT_MSD_AD_FIELD_LENGTH - 1)
 
 #define BT510_MSD_RSP_FIELD_LENGTH 0x10

@@ -8,7 +8,7 @@
  */
 
 #include <logging/log.h>
-#define LOG_LEVEL LOG_LEVEL_DBGb
+#define LOG_LEVEL LOG_LEVEL_DBG
 LOG_MODULE_REGISTER(sensor_table);
 #define FWK_FNAME "sensor_table"
 
@@ -202,8 +202,7 @@ static void PublishToGetAccepted(SensorEntry_t *pEntry);
 static void ShadowAttAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry); //ATT
 static void AttShadowMaker(SensorEntry_t *pEntry); //ATT
 
-// int sendData(const char *message); //ATT
-
+static int sendData(const char *message); //ATT
 /******************************************************************************/
 /* Global Function Definitions                                                */
 /******************************************************************************/
@@ -246,6 +245,11 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 				      uint8_t type, Ad_t *pAd)
 
 {
+	/* for testing to send data to ATT server */
+	// int rc;
+	// rc = sendData("test\n");
+	// LOG_DBG("sendData rc : %u ", rc);
+
 	ARG_UNUSED(type);
 	bool coded = false;
 
@@ -1098,6 +1102,7 @@ static void AttShadowMaker(SensorEntry_t *pEntry)
 		 pEntry->addrString);
 
 	FRAMEWORK_MSG_SEND(pMsg);
+
 	// int rc;
 	// rc = sendData(pMsg->buffer);
 	// LOG_DBG("sendData rc : %u ", rc);
@@ -1182,7 +1187,6 @@ static void ShadowAttAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
 	ShadowBuilder_AddUint32(pMsg, "dc", pEntry->attAd.dc);
 	ShadowBuilder_AddUint32(pMsg, "rf", pEntry->attAd.rf);
 	ShadowBuilder_AddPair(pMsg, "rpm", rpm_float_str, SB_IS_NOT_STRING);
-	ShadowBuilder_AddUint32(pMsg, "extra", pEntry->attAd.extra);
 }
 
 /**
@@ -1650,15 +1654,17 @@ static void PublishToGetAccepted(SensorEntry_t *pEntry)
 	FRAMEWORK_MSG_SEND(pMsg);
 }
 
-/*
-int sendData(const char *message)
+static int sendData(const char *message)
 {
 	int sockfd;
 	int error;
-	struct addrinfo info;
+
+	struct addrinfo *info;
+
 	char reply[2000];
 
 	struct addrinfo hints = {
+
 		.ai_family = AF_INET,
 		.ai_socktype = SOCK_STREAM,
 		.ai_protocol = IPPROTO_TCP,
@@ -1666,40 +1672,50 @@ int sendData(const char *message)
 
 	error = getaddrinfo("runm-west.dataflow.iot.att.com", NULL, &hints,
 			    &info);
-
 	if (error) {
 		// printk("error");
+		LOG_DBG("error DNS lookup failure");
+
 		return 0;
 	}
 
-	((struct sockaddr_in *)info.ai_addr)->sin_port = htons(12200);
+	((struct sockaddr_in *)info->ai_addr)->sin_port = htons(12200);
 
 	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
 	if (sockfd == -1) {
 		// printk("failed to get socket");
+		LOG_DBG("Failed to get socket");
 		return 0;
 	}
 
-	error = connect(sockfd, info.ai_addr, sizeof(struct sockaddr_in));
+	error = connect(sockfd, info->ai_addr, sizeof(struct sockaddr_in));
 	if (error) {
 		//printk("error connect failed");
+		LOG_DBG("Failed to connect");
 		return 0;
 	}
 
 	error = send(sockfd, message, strlen(message), 0);
+	error = send(sockfd, "\n", 1, 0);
 	if (error < 0) {
 		//printk("send failed");
+		LOG_DBG("Failed to send");
 		return 0;
 	}
 
 	if (recv(sockfd, reply, 2000, 0) < 0) {
 		//printk("received failed");
-		close(socketfd);
+		LOG_DBG("Failed to get reply");
+		close(sockfd);
 		return 0;
-	} else {
+	}
+
+	else {
 		//print("reply = %s",reply);
+		LOG_DBG("%s", reply);
 		close(sockfd);
 	}
+
 	return 1;
 }
-*/
