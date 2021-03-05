@@ -1,5 +1,5 @@
 [![Laird Connectivity](docs/images/LairdConnnectivityLogo_Horizontal_RGB.png)](https://www.lairdconnect.com/)
-# MG100 demo with BeckettLink Tank Guage
+# MG100 demo with AT&T BLE device
 
 ## Table of contents  
 1. **[Introduction](#introduction)**
@@ -10,11 +10,10 @@
 6. **[Update firmware](#update-firmware)**
 7. **[Connect to AWS account](#connect-to-aws-account)**
 8. **[Development](#development)**
-9. **[Change source code](#change-source-code)**
 
 ## Introduction
 
-This page is derived from https://github.com/LairdCP/MG100_firmware which is about MG100's LTE-M demo to work with Laird BLE sensors such as BT510 and BME280. The source code is modified here so that MG100 can detect BLE advert data from BeckettLink Tank Guage and push the data to AWS IoT account. 
+This page is derived from https://github.com/LairdCP/MG100_firmware which is about MG100's LTE-M demo to work with Laird BLE sensors such as BT510 and BME280. The source code is modified here so that MG100 can detect BLE advert data from AT&T BLE device and push the data to AWS IoT account. It will eventually send data to AT&T server
 
 Below, the term "firmware" refers to Zephyr firmware for running demo app, unless it is specifically stated HL7800 firmware.
 
@@ -22,8 +21,7 @@ Firmware can be flashed through UART, BLE or SWD (Serial Wire Debug)
 
 ## Prerequisites
 * [MG100](https://www.lairdconnect.com/iot-devices/iot-gateways/sentrius-mg100-gateway-lte-mnb-iot-and-bluetooth-5) with HL7800 firmware v4.3.14.0 or later
-* [BeckettLink Tank Guage](https://www.beckettcorp.com/product/beckettlink-tank-gauge/)
-* Micro USB cable
+* Micro USB cable 
 * If using SWD for firmware upgrade : 
   * [Segger J-Link debugger](https://www.segger.com/products/debug-probes/j-link/models/model-overview/) (The J-Link Base or J-Link Base Compact is recommended) 
   * Programming adapter ([Tag-Connect TC2030-IDC](https://www.tag-connect.com/product/tc2030-idc-6-pin-tag-connect-plug-of-nails-spring-pin-cable-with-legs) and [ARM20-CTX Adapter](https://www.tag-connect.com/product/arm20-ctx-20-pin-to-tc2030-idc-adapter-for-cortex) are recommended) 
@@ -60,7 +58,7 @@ Once `west` is installed, clone this repository using `west init` and `west upda
 
 ```
 # Checkout the latest manifest on master
-west init -m https://github.com/vascode/MG100_firmware_manifest.git
+west init -m https://github.com/vascode/MG100_ATT_firmware_manifest.git
 
 # Now, pull all the source described in the manifest
 west update
@@ -146,11 +144,3 @@ See [here](docs/development.md) for details on developing and debugging this app
 ### BLE Profiles
 
 Details on the BLE profiles used to interface with the mobile app can be found [here](docs/ble.md)
-
-## Change source code
-
-To add your own BLE sensor for this demo, your own data format needs to be defined first and it sould be added to SensorTable. Also your own advert event hanlder needs to be created. Take a look at [this commit](https://github.com/vascode/MG100_firmware/commit/dd6405617c2779fe9539834c67d529bfac36b715) to see what's added from the original code.  For example, 
-* BKAdEvent_t : BeckettLink Tank Gauge's data structure in advert. This is added to SensorEntry_t for SensorTable in sensor_table.c
-* FindBKAdvertisement : Check if the advert is from Beckett by checking payload length and company ID
-* BkAdEventHandler : copy Beckett advert data to Sensortable
-* BkShadowMaker : Prepare shadow in json by referring data in SensorTable
