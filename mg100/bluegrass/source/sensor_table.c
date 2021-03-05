@@ -8,7 +8,7 @@
  */
 
 #include <logging/log.h>
-#define LOG_LEVEL LOG_LEVEL_DBG
+#define LOG_LEVEL LOG_LEVEL_DBGb
 LOG_MODULE_REGISTER(sensor_table);
 #define FWK_FNAME "sensor_table"
 
@@ -19,8 +19,10 @@ LOG_MODULE_REGISTER(sensor_table);
 /******************************************************************************/
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <zephyr.h>
 #include <bluetooth/bluetooth.h>
+#include <net/socket.h>
 
 #include "laird_bluetooth.h"
 #include "qrtc.h"
@@ -34,6 +36,7 @@ LOG_MODULE_REGISTER(sensor_table);
 #include "lte.h"
 #include "sensor_table.h"
 #include "sdcard_log.h"
+#include "app_version.h"
 
 /******************************************************************************/
 /* Local Constant, Macro and Type Definitions                                 */
@@ -81,6 +84,9 @@ BUILD_ASSERT(((sizeof(SENSOR_SUBSCRIPTION_TOPIC_FMT_STR) +
 	(SENSOR_NAME_MAX_SIZE + sizeof('-') + MAX_KEY_STR_LEN)
 #define MANGLED_NAME_MAX_SIZE (MANGLED_NAME_MAX_STR_LEN + 1)
 
+// to convert float to string
+#define CONFIG_ATTR_FLOAT_MAX_STR_SIZE 13
+
 /* {"reported":{"bt510":{"sensors":[["c13a7e4118a2",<epoch>,false], .... */
 #define SENSOR_GATEWAY_SHADOW_MAX_SIZE 600
 CHECK_BUFFER_SIZE(FWK_BUFFER_MSG_SIZE(JsonMsg_t,
@@ -93,12 +99,15 @@ typedef struct SensorEntry {
 	bool updatedName;
 	bool updatedRsp;
 	bool bkFlag; //BK
+	bool attFlag; //ATT
 	uint64_t bkTime; //BK
+	uint64_t attTime; //ATT
 	char name[SENSOR_NAME_MAX_SIZE];
 	char addrString[SENSOR_ADDR_STR_SIZE];
 	Bt510AdEvent_t ad;
 	Bt510Rsp_t rsp;
 	BKAdEvent_t bkAd; //BK
+	AttAdEvent_t attAd; //ATT
 	int8_t rssi;
 	uint8_t lastRecordType;
 	uint32_t rxEpoch;
@@ -141,6 +150,7 @@ static void FreeEntryBuffers(SensorEntry_t *pEntry);
 
 static bool FindBt510Advertisement(AdHandle_t *pHandle);
 static bool FindBKAdvertisement(AdHandle_t *pHandle); //BK
+static bool FindAttAdvertisement(AdHandle_t *pHandle); //ATT
 static bool FindBt510ScanResponse(AdHandle_t *pHandle);
 static bool FindBt510CodedAdvertisement(AdHandle_t *pHandle);
 
@@ -154,6 +164,8 @@ static size_t FindTableIndex(const bt_addr_le_t *pAddr);
 static size_t FindFirstFree(void);
 static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index);
 static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index); //BK
+static void AttAdEventHandler(AttAdEvent_t *p, int8_t Rssi,
+			      uint32_t Index); //ATT
 
 static bool AddrMatch(const void *p, size_t Index);
 static bool AddrStringMatch(const char *str, size_t Index);
@@ -161,6 +173,7 @@ static bool NameMatch(const char *p, size_t Index);
 static bool RspMatch(const Bt510Rsp_t *p, size_t Index);
 static bool NewEvent(uint16_t Id, size_t Index);
 static bool BkNewEvent(size_t Index); //BK
+static bool AttNewEvent(size_t Index, uint8_t _rpm); //ATT
 
 static void SensorAddrToString(SensorEntry_t *pEntry);
 static bt_addr_t BtAddrStringToStruct(const char *pAddrString);
@@ -192,8 +205,12 @@ static void CreateConfigRequest(SensorEntry_t *pEntry);
 static uint32_t GetFlag(uint16_t Value, uint32_t Mask, uint8_t Position);
 
 static void PublishToGetAccepted(SensorEntry_t *pEntry);
-static void ShadowBkAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry);
-static void BkShadowMaker(SensorEntry_t *pEntry);
+static void ShadowBkAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry); //BK
+static void ShadowAttAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry); //ATT
+static void BkShadowMaker(SensorEntry_t *pEntry); //BK
+static void AttShadowMaker(SensorEntry_t *pEntry); //ATT
+
+// int sendData(const char *message); //ATT
 
 /******************************************************************************/
 /* Global Function Definitions                                                */
@@ -206,7 +223,7 @@ void SensorTable_Initialize(void)
 	pLte = lteGetStatus();
 }
 
-/* Is the advert from BT510 or BK? */
+/* Is the advert from BT510 or BK or ATT? */
 bool SensorTable_MatchBt510(struct net_buf_simple *ad)
 {
 	AdHandle_t manHandle = AdFind_Type(
@@ -222,7 +239,12 @@ bool SensorTable_MatchBt510(struct net_buf_simple *ad)
 	if (FindBt510Advertisement(&manHandle)) {
 		return true;
 	}
+
 	if (FindBKAdvertisement(&manHandle)) { //BK - advert from BK?
+		return true;
+	}
+
+	if (FindAttAdvertisement(&manHandle)) { //ATT - advert from ATT?
 		return true;
 	}
 
@@ -271,7 +293,7 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 				memcmp(sensorTable[tableIndex].ad.addr.val,
 				       pAddr->a.val, sizeof(bt_addr_t)) == 0);
 		} else {
-			/* Try to populate table with sensor (without name and scan rsp) */
+			// Try to populate table with sensor (without name and scan rsp)
 			tableIndex = AddByAddress(&pAddr->a);
 		}
 
@@ -292,7 +314,7 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 					       .val, //double check if BK's MAC matches
 				       pAddr->a.val, sizeof(bt_addr_t)) == 0);
 		} else {
-			/* Try to populate table with sensor (without name and scan rsp) */
+			// Try to populate table with sensor (without name and scan rsp)
 			tableIndex = AddByAddress(&pAddr->a);
 		}
 
@@ -301,6 +323,27 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 				(BKAdEvent_t *)
 					manHandle.pPayload; // data after 'FF'
 			BkAdEventHandler(pBkAd, rssi, tableIndex);
+		}
+	}
+
+	if (FindAttAdvertisement(&manHandle)) { //ATT - advert from ATT?
+		size_t tableIndex = FindTableIndex(pAddr);
+		// if already in table
+		if (tableIndex < CONFIG_SENSOR_TABLE_SIZE) {
+			FRAMEWORK_DEBUG_ASSERT(
+				//double check if ATT's MAC matches
+				memcmp(sensorTable[tableIndex].ad.addr.val,
+				       pAddr->a.val, sizeof(bt_addr_t)) == 0);
+		} else {
+			// If not existing, add table with sensor MAC address
+			tableIndex = AddByAddress(&pAddr->a);
+		}
+
+		if (tableIndex < CONFIG_SENSOR_TABLE_SIZE) {
+			// data after 'FF'
+			AttAdEvent_t *pAttAd =
+				(AttAdEvent_t *)manHandle.pPayload;
+			AttAdEventHandler(pAttAd, rssi, tableIndex);
 		}
 	}
 
@@ -706,8 +749,9 @@ static void FreeEntryBuffers(SensorEntry_t *pEntry)
 static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index)
 {
 	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
-	sensorTable[Index].whitelisted = true; //automatically whitelisted to simplify the demo process
-	
+	//automatically whitelisted to simplify the demo process
+	sensorTable[Index].whitelisted = true;
+
 	if (NewEvent(p->id, Index)) {
 		sensorTable[Index].validAd = true;
 		LOG_DBG("New Event for [%u] '%s' (%s) RSSI: %d", Index,
@@ -733,7 +777,8 @@ static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index) //BK
 {
 	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
 	sensorTable[Index].bkFlag = true;
-	sensorTable[Index].whitelisted = true; //automatically whitelisted to simplify the demo process
+	//automatically whitelisted to simplify the demo process
+	sensorTable[Index].whitelisted = true;
 
 	if (BkNewEvent(Index)) {
 		sensorTable[Index].validAd = true;
@@ -753,6 +798,33 @@ static void BkAdEventHandler(BKAdEvent_t *p, int8_t Rssi, uint32_t Index) //BK
 	}
 }
 
+/* AdEventHandler for ATT - copy ATT advert data to table */
+static void AttAdEventHandler(AttAdEvent_t *p, int8_t Rssi, uint32_t Index)
+{
+	sensorTable[Index].ttl = CONFIG_SENSOR_TTL_SECONDS;
+	sensorTable[Index].attFlag = true;
+	sensorTable[Index].whitelisted = true;
+
+	if (AttNewEvent(Index, p->rpm)) {
+		sensorTable[Index].validAd = true;
+		sensorTable[Index].validRsp = true;
+		LOG_DBG("New Event for [%u] '%s' (%s) RSSI: %d", Index,
+			log_strdup(sensorTable[Index].name),
+			log_strdup(sensorTable[Index].addrString), Rssi);
+
+		memcpy(&sensorTable[Index].attAd, p, sizeof(AttAdEvent_t));
+
+		/* If event occurs before epoch is set, then AWS shows ~1970. */
+		sensorTable[Index].rxEpoch = Qrtc_GetEpoch();
+		AttShadowMaker(&sensorTable[Index]);
+
+		/* The cloud uses the RX epoch (in the table) for filtering. */
+		GatewayShadowMaker(false);
+	}
+	// Save rpm value for comparing with future value later
+	// sensorTable[Index].attAd.rpm = p->rpm;
+}
+
 /* The BT510 advertisement can be recognized by the manufacturer
  * specific data type with LAIRD as the company ID.
  * It is further qualified by having a length of 27 and matching protocol ID.
@@ -769,6 +841,7 @@ static bool FindBt510Advertisement(AdHandle_t *pHandle)
 	}
 	return false;
 }
+
 /* Check if the advert is from BK by checking payload length and company ID */
 static bool FindBKAdvertisement(AdHandle_t *pHandle) //BK
 {
@@ -777,6 +850,21 @@ static bool FindBKAdvertisement(AdHandle_t *pHandle) //BK
 			if (memcmp(pHandle->pPayload,
 				   BK_AD_HEADER, // company ID matching?
 				   sizeof(BK_AD_HEADER)) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+/* Check if the advert is from ATT device by checking payload length and company ID */
+static bool FindAttAdvertisement(AdHandle_t *pHandle)
+{
+	if (pHandle->pPayload != NULL) {
+		if ((pHandle->size == ATT_MSD_AD_PAYLOAD_LENGTH)) {
+			// company ID matching?
+			if (memcmp(pHandle->pPayload, ATT_AD_HEADER,
+				   sizeof(ATT_AD_HEADER)) == 0) {
 				return true;
 			}
 		}
@@ -947,6 +1035,7 @@ static bool NewEvent(uint16_t Id, size_t Index)
 		return (Id != sensorTable[Index].ad.id);
 	}
 }
+
 /* NewEvent for BK - interval for two BkNewEvent should be no less than 30 seconds */
 static bool BkNewEvent(size_t Index) //BK
 {
@@ -955,6 +1044,29 @@ static bool BkNewEvent(size_t Index) //BK
 	} else if (sensorTable[Index].bkTime < k_uptime_get()) {
 		sensorTable[Index].bkTime =
 			k_uptime_get() + (30 * MSEC_PER_SEC);
+		return true;
+	}
+
+	return false;
+}
+
+/* What qualifies as ATT new event?  */
+static bool AttNewEvent(size_t Index, uint8_t _rpm)
+{
+	if (!sensorTable[Index].validAd) {
+		return true;
+
+		// Now, it just checks 5 min timer
+		// TODO : rpm change > 10 or 5 min timer expires => true
+		// TODO : rpm changed to float or change 10 to corresponding multiplier
+	} else if (abs(sensorTable[Index].attAd.rpm - _rpm) > 100) {
+		return true;
+
+	} else if (sensorTable[Index].attTime < k_uptime_get()) {
+		// sensorTable[Index].attTime =
+		// 	k_uptime_get() + (60 * 5 * MSEC_PER_SEC);
+		sensorTable[Index].attTime =
+			k_uptime_get() + (20 * MSEC_PER_SEC);
 		return true;
 	}
 
@@ -1045,8 +1157,9 @@ static void BkShadowMaker(SensorEntry_t *pEntry)
 		ShadowBuilder_AddSigned32(pMsg, MangleKey(pEntry->name, "rssi"),
 					  pEntry->rssi);
 	} else {
-		ShadowBtHandler(pMsg, pEntry);	//shadow for BT MAC and RSSI 
-		ShadowBkAdHandler(pMsg, pEntry); //shadow for payload (RWB, tank, battery)
+		ShadowBtHandler(pMsg, pEntry); //shadow for BT MAC and RSSI
+		ShadowBkAdHandler(
+			pMsg, pEntry); //shadow for payload (RWB, tank, battery)
 	}
 	ShadowBuilder_EndGroup(pMsg);
 	ShadowBuilder_EndGroup(pMsg);
@@ -1060,6 +1173,72 @@ static void BkShadowMaker(SensorEntry_t *pEntry)
 		 pEntry->addrString);
 
 	FRAMEWORK_MSG_SEND(pMsg);
+}
+
+static void AttShadowMaker(SensorEntry_t *pEntry)
+{
+	/* AWS will disconnect if data is sent for devices that have not
+	 * been whitelisted. - ATT device is whitelisted automatically
+	 */
+	if (!CONFIG_USE_SINGLE_AWS_TOPIC) {
+		if (!pEntry->whitelisted || !pEntry->shadowInitReceived) {
+			return;
+		}
+	}
+
+	JsonMsg_t *pMsg = BufferPool_Take(
+		FWK_BUFFER_MSG_SIZE(JsonMsg_t, SHADOW_BUF_SIZE));
+	if (pMsg == NULL) {
+		return;
+	}
+
+	pMsg->header.msgCode = FMC_SENSOR_PUBLISH;
+	pMsg->header.rxId = FWK_ID_CLOUD;
+	pMsg->size = SHADOW_BUF_SIZE;
+
+	ShadowBuilder_Start(pMsg, SKIP_MEMSET);
+
+	ShadowBuilder_StartGroup(pMsg, "gateway");
+
+	// ATT : Test for gateway info in json
+	ShadowBuilder_AddPair(pMsg, "ver", APP_VERSION_STRING, SB_IS_STRING);
+	struct lte_status *lte_status = lteGetStatus();
+	ShadowBuilder_AddPair(pMsg, "imei", lte_status->IMEI, SB_IS_STRING);
+	ShadowBuilder_AddPair(pMsg, "iccid", lte_status->ICCID, SB_IS_STRING);
+	ShadowBuilder_AddSigned32(pMsg, "gwrssi", lte_status->rssi);
+
+	ShadowBuilder_EndGroup(pMsg);
+
+	ShadowBuilder_AttStartGroup(pMsg, "beacons");
+	// ShadowBuilder_AttStartArray(pMsg, "sensors");
+
+	if (CONFIG_USE_SINGLE_AWS_TOPIC) {
+		ShadowTemperatureHandler(pMsg, pEntry);
+		/* Sending RSSI prevents an empty buffer when
+		 * temperature isn't present.
+		 */
+		ShadowBuilder_AddSigned32(pMsg, MangleKey(pEntry->name, "rssi"),
+					  pEntry->rssi);
+	} else {
+		// ShadowBtHandler(pMsg, pEntry); //shadow for BT MAC and RSSI
+		ShadowAttAdHandler(pMsg, pEntry); //shadow for payload
+	}
+
+	// ShadowBuilder_AttEndArray(pMsg);
+	ShadowBuilder_AttEndGroup(pMsg);
+	ShadowBuilder_Finalize(pMsg);
+
+	/* The part of the topic that changes must match
+	 * the format of the address field generated by ShadowGatewayMaker.
+	 */
+	char *fmt = SENSOR_UPDATE_TOPIC_FMT_STR;
+	snprintk(pMsg->topic, CONFIG_AWS_TOPIC_MAX_SIZE, fmt,
+		 pEntry->addrString);
+
+	FRAMEWORK_MSG_SEND(pMsg);
+	// int rc;
+	// rc = sendData(pMsg->buffer);
+	// LOG_DBG("sendData rc : %u ", rc);
 }
 
 /**
@@ -1117,6 +1296,42 @@ static void ShadowBkAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
 	ShadowBuilder_AddUint32(pMsg, "RWB", pEntry->bkAd.rwb);
 	ShadowBuilder_AddUint32(pMsg, "tank", pEntry->bkAd.tank);
 	ShadowBuilder_AddUint32(pMsg, "battery", pEntry->bkAd.battery);
+}
+
+static void ShadowAttAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
+{
+	if (!pEntry->validAd) {
+		return;
+	}
+
+	// MAC address to string with ':' between each byte
+	char bt_addr[BT_ADDR_LE_STR_LEN];
+	snprintk(bt_addr, sizeof(bt_addr), "%02X:%02X:%02X:%02X:%02X:%02X",
+		 pEntry->addrString[5], pEntry->addrString[4],
+		 pEntry->addrString[3], pEntry->addrString[2],
+		 pEntry->addrString[1], pEntry->addrString[0]);
+
+	// data conversion for battery
+	float bat_float = (float)pEntry->attAd.bat / 1000;
+	char bat_float_str[CONFIG_ATTR_FLOAT_MAX_STR_SIZE];
+	snprintf(bat_float_str, sizeof(bat_float_str), "%0.4f", bat_float);
+
+	float rpm_float = (float)pEntry->attAd.rpm / 10;
+	char rpm_float_str[CONFIG_ATTR_FLOAT_MAX_STR_SIZE];
+	snprintf(rpm_float_str, sizeof(rpm_float_str), "%0.2f", rpm_float);
+
+	ShadowBuilder_AddPair(pMsg, "mac", bt_addr, SB_IS_STRING);
+	ShadowBuilder_AddSigned32(pMsg, "rssi", pEntry->rssi);
+	ShadowBuilder_AddUint32(pMsg, "mlc", pEntry->attAd.mlc);
+	ShadowBuilder_AddUint32(pMsg, "clk", pEntry->attAd.clk);
+	// ShadowBuilder_AddUint32(pMsg, "bat", pEntry->attAd.bat)
+	ShadowBuilder_AddPair(pMsg, "bat", bat_float_str, SB_IS_NOT_STRING);
+	ShadowBuilder_AddUint32(pMsg, "stp", pEntry->attAd.stp);
+	ShadowBuilder_AddUint32(pMsg, "qd", pEntry->attAd.qd);
+	ShadowBuilder_AddUint32(pMsg, "dc", pEntry->attAd.dc);
+	ShadowBuilder_AddUint32(pMsg, "rf", pEntry->attAd.rf);
+	ShadowBuilder_AddPair(pMsg, "rpm", rpm_float_str, SB_IS_NOT_STRING);
+	ShadowBuilder_AddUint32(pMsg, "extra", pEntry->attAd.extra);
 }
 
 /**
@@ -1199,8 +1414,8 @@ static void ShadowTemperatureHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
 		ShadowBuilder_AddSigned32(
 			pMsg,
 			MangleKey(pEntry->name, CONFIG_USE_SINGLE_AWS_TOPIC ?
-							"temperature" :
-							"tempCc"),
+							      "temperature" :
+							      "tempCc"),
 			temperature);
 		break;
 	default:
@@ -1583,3 +1798,57 @@ static void PublishToGetAccepted(SensorEntry_t *pEntry)
 	pMsg->length = strlen(pMsg->buffer);
 	FRAMEWORK_MSG_SEND(pMsg);
 }
+
+/*
+int sendData(const char *message)
+{
+	int sockfd;
+	int error;
+	struct addrinfo info;
+	char reply[2000];
+
+	struct addrinfo hints = {
+		.ai_family = AF_INET,
+		.ai_socktype = SOCK_STREAM,
+		.ai_protocol = IPPROTO_TCP,
+	};
+
+	error = getaddrinfo("runm-west.dataflow.iot.att.com", NULL, &hints,
+			    &info);
+
+	if (error) {
+		// printk("error");
+		return 0;
+	}
+
+	((struct sockaddr_in *)info.ai_addr)->sin_port = htons(12200);
+
+	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (sockfd == -1) {
+		// printk("failed to get socket");
+		return 0;
+	}
+
+	error = connect(sockfd, info.ai_addr, sizeof(struct sockaddr_in));
+	if (error) {
+		//printk("error connect failed");
+		return 0;
+	}
+
+	error = send(sockfd, message, strlen(message), 0);
+	if (error < 0) {
+		//printk("send failed");
+		return 0;
+	}
+
+	if (recv(sockfd, reply, 2000, 0) < 0) {
+		//printk("received failed");
+		close(socketfd);
+		return 0;
+	} else {
+		//print("reply = %s",reply);
+		close(sockfd);
+	}
+	return 1;
+}
+*/

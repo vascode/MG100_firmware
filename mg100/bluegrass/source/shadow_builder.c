@@ -33,6 +33,11 @@ LOG_MODULE_REGISTER(shadow_builder);
 		JSON_APPEND_CHAR('"');                                         \
 	} while (0)
 
+#define JSON_APPEND_VALUE_STRING_ATT(s)                                        \
+	do {                                                                   \
+		JSON_APPEND_STRING(s);                                         \
+	} while (0)
+
 #define JSON_APPEND_KEY(s)                                                     \
 	do {                                                                   \
 		JSON_APPEND_VALUE_STRING(s);                                   \
@@ -95,6 +100,20 @@ void ShadowBuilder_Finalize(JsonMsg_t *pJsonMsg)
 
 void ShadowBuilder_AddUint32(JsonMsg_t *pJsonMsg, const char *restrict pKey,
 			     uint32_t Value)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	FRAMEWORK_ASSERT(pKey != NULL);
+	FRAMEWORK_ASSERT(strlen(pKey) > 0);
+
+	JSON_APPEND_KEY(pKey);
+	memset(str, 0, MAXIMUM_LENGTH_OF_TO_STRING_OUTPUT);
+	ToString_Dec(str, Value);
+	JSON_APPEND_STRING(str);
+	JSON_APPEND_CHAR(',');
+}
+
+void ShadowBuilder_AddFloat(JsonMsg_t *pJsonMsg, const char *restrict pKey,
+			    float Value)
 {
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	FRAMEWORK_ASSERT(pKey != NULL);
@@ -207,12 +226,33 @@ void ShadowBuilder_StartGroup(JsonMsg_t *pJsonMsg, const char *restrict pKey)
 	JSON_APPEND_CHAR('{');
 }
 
+void ShadowBuilder_AttStartGroup(JsonMsg_t *pJsonMsg, const char *restrict pKey)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	FRAMEWORK_ASSERT(pKey != NULL);
+	FRAMEWORK_ASSERT(strlen(pKey) > 0);
+
+	JSON_APPEND_KEY(pKey);
+	JSON_APPEND_CHAR('[');
+	JSON_APPEND_CHAR('{');
+}
+
 void ShadowBuilder_EndGroup(JsonMsg_t *pJsonMsg)
 {
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
 
 	pJsonMsg->buffer[pJsonMsg->length - 1] = '}';
+	JSON_APPEND_CHAR(',');
+}
+
+void ShadowBuilder_AttEndGroup(JsonMsg_t *pJsonMsg)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
+
+	pJsonMsg->buffer[pJsonMsg->length - 1] = '}';
+	JSON_APPEND_CHAR(']');
 	JSON_APPEND_CHAR(',');
 }
 
@@ -226,12 +266,35 @@ void ShadowBuilder_StartArray(JsonMsg_t *pJsonMsg, const char *restrict pKey)
 	JSON_APPEND_CHAR('[');
 }
 
+void ShadowBuilder_AttStartArray(JsonMsg_t *pJsonMsg, const char *restrict pKey)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	FRAMEWORK_ASSERT(pKey != NULL);
+	FRAMEWORK_ASSERT(strlen(pKey) > 0);
+
+	JSON_APPEND_KEY(pKey);
+	JSON_APPEND_CHAR('[');
+	JSON_APPEND_CHAR('{');
+}
+
 void ShadowBuilder_EndArray(JsonMsg_t *pJsonMsg)
 {
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
 
 	pJsonMsg->buffer[pJsonMsg->length - 1] = ']';
+
+	JSON_APPEND_CHAR(',');
+}
+
+void ShadowBuilder_AttEndArray(JsonMsg_t *pJsonMsg)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
+
+	pJsonMsg->buffer[pJsonMsg->length - 1] = '}';
+	// pJsonMsg->buffer[pJsonMsg->length - 1] = ']';
+	JSON_APPEND_CHAR(']');
 	JSON_APPEND_CHAR(',');
 }
 

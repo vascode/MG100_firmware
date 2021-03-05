@@ -90,9 +90,22 @@ void ShadowBuilder_AddFalse(JsonMsg_t *pJsonMsg, const char *restrict pKey);
 void ShadowBuilder_StartArray(JsonMsg_t *pJsonMsg, const char *restrict pKey);
 
 /**
+ * @brief Adds "pKey": [
+ *
+ * @param pKey name of key
+ */
+void ShadowBuilder_AttStartArray(JsonMsg_t *pJsonMsg,
+				 const char *restrict pKey);
+
+/**
  * @brief Closes JSON array
  */
 void ShadowBuilder_EndArray(JsonMsg_t *pJsonMsg);
+
+/**
+ * @brief Closes JSON array
+ */
+void ShadowBuilder_AttEndArray(JsonMsg_t *pJsonMsg);
 
 /**
  * @brief Adds ["addr", epoch, true/false], to JSON buffer
@@ -100,7 +113,6 @@ void ShadowBuilder_EndArray(JsonMsg_t *pJsonMsg);
 void ShadowBuilder_AddSensorTableArrayEntry(JsonMsg_t *pJsonMsg,
 					    const char *restrict pAddrStr,
 					    uint32_t Epoch, bool Whitelisted);
-
 /**
  * @brief Adds "pKey": {
  *
@@ -108,10 +120,15 @@ void ShadowBuilder_AddSensorTableArrayEntry(JsonMsg_t *pJsonMsg,
  */
 void ShadowBuilder_StartGroup(JsonMsg_t *pJsonMsg, const char *restrict pKey);
 
+void ShadowBuilder_AttStartGroup(JsonMsg_t *pJsonMsg,
+				 const char *restrict pKey);
+
 /**
  * @brief Closes JSON group
  */
 void ShadowBuilder_EndGroup(JsonMsg_t *pJsonMsg);
+
+void ShadowBuilder_AttEndGroup(JsonMsg_t *pJsonMsg);
 
 /**
  * @brief Add a string to the buffer (without " ").
