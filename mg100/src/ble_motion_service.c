@@ -190,7 +190,6 @@ int GetOdr()
 {
 	int Value = 0;
 	nvReadAccelODR(&Value);
-	// LOG_DBG("ODR = %d", Value); //BK
 
 	return (Value);
 }
@@ -199,7 +198,6 @@ int GetScale()
 {
 	int Value = 0;
 	nvReadAccelScale(&Value);
-	// LOG_DBG("Scale = %d", Value); //BK
 
 	return (Value);
 }
@@ -208,7 +206,6 @@ int GetActivityThreshold()
 {
 	int Value = 0;
 	nvReadAccelThresh(&Value);
-	// LOG_DBG("Threshold = %d", Value); //BK
 
 	return (Value);
 }
