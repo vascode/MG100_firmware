@@ -343,6 +343,15 @@ void ShadowBuilder_AddString(JsonMsg_t *pJsonMsg, const char *restrict pKey,
 	JSON_APPEND_CHAR(',');
 }
 
+void ShadowBuilder_Addnewline(JsonMsg_t *pJsonMsg)
+{
+	FRAMEWORK_ASSERT(pJsonMsg != NULL);
+	//FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
+	//pJsonMsg->buffer[pJsonMsg->length - 1] = '\n';
+
+	JSON_APPEND_CHAR('\n');
+}
+
 /******************************************************************************/
 /* Local Function Definitions                                                 */
 /******************************************************************************/

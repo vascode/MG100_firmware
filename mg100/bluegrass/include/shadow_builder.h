@@ -138,6 +138,11 @@ void ShadowBuilder_AddString(JsonMsg_t *pJsonMsg, const char *restrict pKey,
 			     const char *restrict pStr);
 
 /**
+ * @brief Add '\n' to the end of json data 
+ */
+void ShadowBuilder_Addnewline(JsonMsg_t *pJsonMsg);
+
+/**
  * @brief Add an event log entry to the buffer.
  */
 void ShadowBuilder_AddEventLogEntry(JsonMsg_t *pJsonMsg, SensorLogEvent_t *p);

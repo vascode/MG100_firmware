@@ -506,8 +506,8 @@ static DispatchResult_t ConnectRequestMsgHandler(FwkMsgReceiver_t *pMsgRxer,
 		pObj->configComplete = false;
 		err = bt_conn_le_create(&pObj->pCmdMsg->addr,
 					pObj->pCmdMsg->useCodedPhy ?
-						BT_CONN_CODED_CREATE_CONN :
-						BT_CONN_LE_CREATE_CONN,
+						      BT_CONN_CODED_CREATE_CONN :
+						      BT_CONN_LE_CREATE_CONN,
 					BT_LE_CONN_PARAM_DEFAULT, &pObj->conn);
 
 		LOG_INF("Connection Request (%u): '%s' (%s) %x-%u",

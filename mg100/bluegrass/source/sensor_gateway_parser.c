@@ -237,6 +237,7 @@ static void BuildAndSendLocalConfigNullResponse()
 		 awsGetGatewayUpdateDeltaTopic());
 
 	FRAMEWORK_MSG_SEND(pMsg);
+	// BufferPool_Free(pMsg);
 }
 static void BuildAndSendLocalConfigResponse()
 {
@@ -284,6 +285,7 @@ static void BuildAndSendLocalConfigResponse()
 		 awsGetGatewayUpdateDeltaTopic());
 
 	FRAMEWORK_MSG_SEND(pMsg);
+	//BufferPool_Free(pMsg);
 }
 
 static bool ValuesUpdated(uint16_t Value)
