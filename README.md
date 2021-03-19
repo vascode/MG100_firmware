@@ -4,7 +4,7 @@
 ## Table of contents  
 1. **[Introduction](#introduction)**
 2. **[Prerequisites](#prerequisites)**
-3. **[Use binary for demo](#use-binary-for-demo)**
+3. **[Flash with binary for demo](#flash-with-binary-for-demo)**
 4. **[Clone firmware source](#clone-firmware-source)**
 5. **[Build firmware](#build-firmware)**
 6. **[Update firmware](#update-firmware)**
@@ -13,9 +13,9 @@
 
 ## Introduction
 
-This page is derived from https://github.com/LairdCP/MG100_firmware which is about MG100's LTE-M demo to work with Laird BLE sensors such as BT510 and BME280. The source code is modified here so that MG100 can detect BLE advert data from AT&T BLE device and push the data to AWS IoT account. It will eventually send data to AT&T server
+This page is derived from https://github.com/LairdCP/MG100_firmware which is about MG100's LTE-M demo to work with Laird BLE sensors such as BT510 and BME280. The source code is modified here so that MG100 can detect BLE advert data from AT&T BLE device and push the data to AT&T's TCP server. 
 
-Below, the term "firmware" refers to Zephyr firmware for running demo app, unless it is specifically stated HL7800 firmware.
+Below, the term "firmware" refers to Zephyr application for running demo app, unless it is specifically stated HL7800 firmware.
 
 Firmware can be flashed through UART, BLE or SWD (Serial Wire Debug) 
 
@@ -26,15 +26,15 @@ Firmware can be flashed through UART, BLE or SWD (Serial Wire Debug)
   * [Segger J-Link debugger](https://www.segger.com/products/debug-probes/j-link/models/model-overview/) (The J-Link Base or J-Link Base Compact is recommended) 
   * Programming adapter ([Tag-Connect TC2030-IDC](https://www.tag-connect.com/product/tc2030-idc-6-pin-tag-connect-plug-of-nails-spring-pin-cable-with-legs) and [ARM20-CTX Adapter](https://www.tag-connect.com/product/arm20-ctx-20-pin-to-tc2030-idc-adapter-for-cortex) are recommended) 
 
-## Use binary for demo
+## Flash with binary for demo
 
-To just upload binary file via SWD without building, download [merged.hex](https://rfpros.sharepoint.com/:u:/s/share01/support/EXmSR0Fm4oZDk2XxAZGBVE8B8eEYTu8_6IFVt3wOQJX-jA?e=vIz20g) and use the command : 
+To upload binary file via SWD without building, download [merged.hex](https://rfpros.sharepoint.com/:u:/s/share01/support/EclRKoK6wKpLu6MEQ5zGRb8BZL_GXM4_JrWigUnRn5umoQ?e=MbKY0H) and use the command : 
 
 ```
-nrfjprog -f NRF52 --program merged.hex --chiperase --reset
+nrfjprog -f NRF52 --program zephyr.hex --chiperase --reset
 ```
 
-If you just upload binary file via UART without building, download [app_update.bin](https://rfpros.sharepoint.com/:u:/s/share01/support/EdUFf4u-3NBNnXmQqfLht-cBZMJlYJ9o1V2lfh4v2qTvgA?e=Mw4sh1) and follow instruction [here](docs/firmware_update.md). 
+To upload binary file via UART without building, download [app_update.bin](https://rfpros.sharepoint.com/:u:/s/share01/support/EfFRKl2PQz9Mj7y3xs8mI3QBltqmlPFm5WUTtwzlGzZaAw?e=DWOK8l) and follow instruction [here](docs/firmware_update.md). 
 
 
 
@@ -108,7 +108,7 @@ copy ..\modules\zephyr_lib\mcuboot_config\pm_static.pinnacle100.yml mg100\pm_sta
 
 ## Update firmware
 
-If the MG100 is running v2.0.0 firmware or earlier, firmmare updates must be programmed via SWD(Serial Wire Debug). To do this, consult the [MG100 Hardware Guide](https://www.lairdconnect.com/documentation/mg100-gateway-hardware-guide) section 5.4.4 to learn how to connect a J-Link debugger to the board.
+If the MG100 is running v2.0.0 firmware or earlier, firmmare updates must be programmed via SWD (Serial Wire Debug). To do this, consult the [MG100 Hardware Guide](https://www.lairdconnect.com/documentation/mg100-gateway-hardware-guide) section 5.4.4 to learn how to connect a J-Link debugger to the board.
 
 MG100 units with version 3.x or greater support firmware updates via UART, BLE or LTE.
 
