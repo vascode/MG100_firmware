@@ -39,6 +39,11 @@ LOG_MODULE_REGISTER(sensor_table);
 #include "app_version.h"
 
 /******************************************************************************/
+/* Global Data Definitions                                                    */
+/******************************************************************************/
+bool att_connected = false;
+
+/******************************************************************************/
 /* Local Constant, Macro and Type Definitions                                 */
 /******************************************************************************/
 #define SENSOR_UPDATE_TOPIC_FMT_STR CONFIG_SENSOR_TOPIC_FMT_STR_PREFIX "/update"
@@ -74,6 +79,8 @@ LOG_MODULE_REGISTER(sensor_table);
 	(JSON_DEFAULT_BUF_SIZE +                                               \
 	 (CONFIG_SENSOR_LOG_MAX_SIZE * SENSOR_LOG_ENTRY_JSON_STR_SIZE))
 CHECK_BUFFER_SIZE(FWK_BUFFER_MSG_SIZE(JsonMsg_t, SHADOW_BUF_SIZE));
+
+#define ATT_SHADOW_BUF_SIZE 250
 
 BUILD_ASSERT(((sizeof(SENSOR_SUBSCRIPTION_TOPIC_FMT_STR) +
 	       SENSOR_ADDR_STR_LEN) < CONFIG_AWS_TOPIC_MAX_SIZE),
@@ -245,11 +252,6 @@ void SensorTable_AdvertisementHandler(const bt_addr_le_t *pAddr, int8_t rssi,
 				      uint8_t type, Ad_t *pAd)
 
 {
-	/* for testing to send data to ATT server */
-	// int rc;
-	// rc = sendData("test\n");
-	// LOG_DBG("sendData rc : %u ", rc);
-
 	ARG_UNUSED(type);
 	bool coded = false;
 
@@ -739,7 +741,7 @@ static void AdEventHandler(Bt510AdEvent_t *p, int8_t Rssi, uint32_t Index)
 		sdCardLogAdEvent(p);
 
 		/* The cloud uses the RX epoch (in the table) for filtering. */
-		GatewayShadowMaker(false);
+		// GatewayShadowMaker(false);
 	}
 }
 
@@ -758,16 +760,12 @@ static void AttAdEventHandler(AttAdEvent_t *p, int8_t Rssi, uint32_t Index)
 			log_strdup(sensorTable[Index].addrString), Rssi);
 
 		memcpy(&sensorTable[Index].attAd, p, sizeof(AttAdEvent_t));
+		sensorTable[Index].rssi = Rssi;
 
 		/* If event occurs before epoch is set, then AWS shows ~1970. */
 		sensorTable[Index].rxEpoch = Qrtc_GetEpoch();
 		AttShadowMaker(&sensorTable[Index]);
-
-		/* The cloud uses the RX epoch (in the table) for filtering. */
-		GatewayShadowMaker(false);
 	}
-	// Save rpm value for comparing with future value later
-	// sensorTable[Index].attAd.rpm = p->rpm;
 }
 
 /* The BT510 advertisement can be recognized by the manufacturer
@@ -969,20 +967,22 @@ static bool NewEvent(uint16_t Id, size_t Index)
 /* What qualifies as ATT new event?  */
 static bool AttNewEvent(size_t Index, uint8_t _rpm)
 {
+	// LOG_DBG("time : %u %u", sensorTable[Index].attTime, k_uptime_get());
+
+	// Do not send data for first 30 seconds after bootup.
+	if (k_uptime_get() < (20 * MSEC_PER_SEC)) {
+		return false;
+	}
+
 	if (!sensorTable[Index].validAd) {
 		return true;
 
-		// Now, it just checks 5 min timer
-		// TODO : rpm change > 10 or 5 min timer expires => true
-		// TODO : rpm changed to float or change 10 to corresponding multiplier
 	} else if (abs(sensorTable[Index].attAd.rpm - _rpm) > 10) {
 		return true;
 
 	} else if (sensorTable[Index].attTime < k_uptime_get()) {
-		// sensorTable[Index].attTime =
-		// 	k_uptime_get() + (60 * 5 * MSEC_PER_SEC);
 		sensorTable[Index].attTime =
-			k_uptime_get() + (5 * MSEC_PER_SEC);
+			k_uptime_get() + (60 * 5 * MSEC_PER_SEC);
 		return true;
 	}
 
@@ -1038,29 +1038,21 @@ static void ShadowMaker(SensorEntry_t *pEntry)
 	snprintk(pMsg->topic, CONFIG_AWS_TOPIC_MAX_SIZE, fmt,
 		 pEntry->addrString);
 
-	FRAMEWORK_MSG_SEND(pMsg);
+	// FRAMEWORK_MSG_SEND(pMsg);
+	BufferPool_Free(pMsg);
 }
 
 static void AttShadowMaker(SensorEntry_t *pEntry)
 {
-	/* AWS will disconnect if data is sent for devices that have not
-	 * been whitelisted. - ATT device is whitelisted automatically
-	 */
-	if (!CONFIG_USE_SINGLE_AWS_TOPIC) {
-		if (!pEntry->whitelisted || !pEntry->shadowInitReceived) {
-			return;
-		}
-	}
-
 	JsonMsg_t *pMsg = BufferPool_Take(
 		FWK_BUFFER_MSG_SIZE(JsonMsg_t, SHADOW_BUF_SIZE));
 	if (pMsg == NULL) {
 		return;
 	}
-
 	pMsg->header.msgCode = FMC_SENSOR_PUBLISH;
 	pMsg->header.rxId = FWK_ID_CLOUD;
-	pMsg->size = SHADOW_BUF_SIZE;
+	// pMsg->size = SHADOW_BUF_SIZE;
+	pMsg->size = ATT_SHADOW_BUF_SIZE;
 
 	ShadowBuilder_Start(pMsg, SKIP_MEMSET);
 
@@ -1076,19 +1068,8 @@ static void AttShadowMaker(SensorEntry_t *pEntry)
 	ShadowBuilder_EndGroup(pMsg);
 
 	ShadowBuilder_AttStartGroup(pMsg, "beacons");
-	// ShadowBuilder_AttStartArray(pMsg, "sensors");
 
-	if (CONFIG_USE_SINGLE_AWS_TOPIC) {
-		ShadowTemperatureHandler(pMsg, pEntry);
-		/* Sending RSSI prevents an empty buffer when
-		 * temperature isn't present.
-		 */
-		ShadowBuilder_AddSigned32(pMsg, MangleKey(pEntry->name, "rssi"),
-					  pEntry->rssi);
-	} else {
-		// ShadowBtHandler(pMsg, pEntry); //shadow for BT MAC and RSSI
-		ShadowAttAdHandler(pMsg, pEntry); //shadow for payload
-	}
+	ShadowAttAdHandler(pMsg, pEntry); //shadow for payload
 
 	// ShadowBuilder_AttEndArray(pMsg);
 	ShadowBuilder_AttEndGroup(pMsg);
@@ -1103,21 +1084,13 @@ static void AttShadowMaker(SensorEntry_t *pEntry)
 		 pEntry->addrString);
 
 	int rc;
-	// // rc = sendData(pMsg->buffer);
-	// rc = sendData("test");
-	// LOG_DBG("sendData rc : %u ", rc);
+	// LOG_DBG("sendData rc : %s ", log_strdup(pMsg->buffer));
+	LOG_DBG("sendData rc : %s ", pMsg->buffer);
 
-	// char tmp = '\n';
-	// size_t len = strlen(pMsg->buffer);
-
-	// snprintf(str + len, sizeof str - len, "%c", tmp);
-
-	LOG_DBG("sendData rc : %s ", log_strdup(pMsg->buffer));
 	rc = AttSendData(pMsg->buffer);
-	//rc = sendData("test\n");
 
-	FRAMEWORK_MSG_SEND(pMsg);
-	// BufferPool_Free(pMsg);
+	// FRAMEWORK_MSG_SEND(pMsg);
+	BufferPool_Free(pMsg);
 }
 
 /**
@@ -1192,7 +1165,6 @@ static void ShadowAttAdHandler(JsonMsg_t *pMsg, SensorEntry_t *pEntry)
 	ShadowBuilder_AddSigned32(pMsg, "rssi", pEntry->rssi);
 	ShadowBuilder_AddUint32(pMsg, "mlc", pEntry->attAd.mlc);
 	ShadowBuilder_AddUint32(pMsg, "clk", pEntry->attAd.clk);
-	// ShadowBuilder_AddUint32(pMsg, "bat", pEntry->attAd.bat)
 	ShadowBuilder_AddPair(pMsg, "bat", bat_float_str, SB_IS_NOT_STRING);
 	ShadowBuilder_AddUint32(pMsg, "stp", pEntry->attAd.stp);
 	ShadowBuilder_AddUint32(pMsg, "qd", pEntry->attAd.qd);
@@ -1669,8 +1641,6 @@ static void PublishToGetAccepted(SensorEntry_t *pEntry)
 
 static int AttSendData(const char *message)
 {
-	LOG_DBG("in sendData");
-
 	int sockfd;
 	int error;
 
@@ -1685,52 +1655,56 @@ static int AttSendData(const char *message)
 		.ai_protocol = IPPROTO_TCP,
 	};
 
-	error = getaddrinfo("runm-west.dataflow.iot.att.com", NULL, &hints,
-			    &info);
-	if (error) {
-		// printk("error");
-		LOG_DBG("error DNS lookup failure");
+	if (!att_connected) {
+		error = getaddrinfo("runm-west.dataflow.iot.att.com", NULL,
+				    &hints, &info);
+		if (error) {
+			LOG_DBG("error DNS lookup failure");
 
-		return 0;
+			return 0;
+		} else {
+			att_connected = true;
+		}
+	} else {
+		((struct sockaddr_in *)info->ai_addr)->sin_port = htons(12200);
+
+		sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+		if (sockfd == -1) {
+			att_connected = false;
+			LOG_DBG("Failed to get socket");
+			return 0;
+		}
+
+		error = connect(sockfd, info->ai_addr,
+				sizeof(struct sockaddr_in));
+		if (error) {
+			att_connected = false;
+			LOG_DBG("Failed to connect");
+			return 0;
+		}
+
+		error = send(sockfd, message, strlen(message), 0);
+		//error = send(sockfd, "\n", 1, 0);
+		if (error < 0) {
+			att_connected = false;
+			LOG_DBG("Failed to send");
+			return 0;
+		}
+
+		if (recv(sockfd, reply, 2000, 0) < 0) {
+			att_connected = false;
+			LOG_DBG("Failed to get reply");
+			close(sockfd);
+			return 0;
+		}
+
+		else {
+			LOG_DBG("%s", log_strdup(reply));
+			close(sockfd);
+		}
+
+		return 1;
 	}
-
-	((struct sockaddr_in *)info->ai_addr)->sin_port = htons(12200);
-
-	sockfd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-
-	if (sockfd == -1) {
-		// printk("failed to get socket");
-		LOG_DBG("Failed to get socket");
-		return 0;
-	}
-
-	error = connect(sockfd, info->ai_addr, sizeof(struct sockaddr_in));
-	if (error) {
-		//printk("error connect failed");
-		LOG_DBG("Failed to connect");
-		return 0;
-	}
-
-	error = send(sockfd, message, strlen(message), 0);
-	//error = send(sockfd, "\n", 1, 0);
-	if (error < 0) {
-		//printk("send failed");
-		LOG_DBG("Failed to send");
-		return 0;
-	}
-
-	if (recv(sockfd, reply, 2000, 0) < 0) {
-		//printk("received failed");
-		LOG_DBG("Failed to get reply");
-		close(sockfd);
-		return 0;
-	}
-
-	else {
-		//print("reply = %s",reply);
-		LOG_DBG("%s", reply);
-		close(sockfd);
-	}
-
-	return 1;
+	return 0;
 }

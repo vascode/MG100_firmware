@@ -54,6 +54,10 @@ static const unsigned char aws_root_ca[] =
 
 #define SERVER_PORT_STR "8883"
 
+#define ATT_DEFAULT_ENDPOINT "runm-west.dataflow.iot.att.com"
+
+#define ATT_SERVER_PORT_STR "12200"
+
 #define APP_SLEEP_MSECS 500
 
 #define PUBLISH_TIMEOUT_TICKS K_SECONDS(5)
@@ -65,38 +69,38 @@ static const unsigned char aws_root_ca[] =
 #define DEFAULT_MQTT_CLIENTID "mg100"
 #define AWS_MQTT_ID_MAX_SIZE 128
 
-#define SHADOW_STATE_NULL			"{\"state\":null}"
-#define SHADOW_REPORTED_START		"{\"state\":{\"reported\":{"
-#define SHADOW_REPORTED_END			"}}}"
-#define SHADOW_TEMPERATURE			"\"temperature\":"
-#define SHADOW_HUMIDITY				"\"humidity\":"
-#define SHADOW_PRESSURE				"\"pressure\":"
-#define SHADOW_RADIO_RSSI			"\"radio_rssi\":"
-#define SHADOW_RADIO_SINR			"\"radio_sinr\":"
-#define SHADOW_TEMPERATURE			"\"temperature\":"
-#define SHADOW_HUMIDITY				"\"humidity\":"
-#define SHADOW_PRESSURE				"\"pressure\":"
-#define SHADOW_RADIO_RSSI			"\"radio_rssi\":"
-#define SHADOW_RADIO_SINR			"\"radio_sinr\":"
-#define SHADOW_MG100_TEMP			"\"tempC\":"
-#define SHADOW_MG100_BATT_LEVEL		"\"batteryLevel\":"
-#define SHADOW_MG100_BATT_VOLT		"\"batteryVoltageMv\":"
-#define SHADOW_MG100_PWR_STATE		"\"powerState\":"
-#define SHADOW_MG100_BATT_LOW		"\"batteryLowThreshold\":"
-#define SHADOW_MG100_BATT_0			"\"battery0\":"
-#define SHADOW_MG100_BATT_1			"\"battery1\":"
-#define SHADOW_MG100_BATT_2			"\"battery2\":"
-#define SHADOW_MG100_BATT_3			"\"battery3\":"
-#define SHADOW_MG100_BATT_4			"\"battery4\":"
-#define SHADOW_MG100_BATT_GOOD		"\"batteryGood\":"
-#define SHADOW_MG100_BATT_BAD		"\"batteryBadThreshold\":"
-#define SHADOW_MG100_ODR			"\"odr\":"
-#define SHADOW_MG100_SCALE			"\"scale\":"
-#define SHADOW_MG100_ACT_THS		"\"activationThreshold\":"
-#define SHADOW_MG100_MOVEMENT		"\"movement\":"
-#define SHADOW_MG100_MAX_LOG_SIZE	"\"maxLogSizeMB\":"
-#define SHADOW_MG100_SDCARD_FREE	"\"sdCardFreeMB\":"
-#define SHADOW_MG100_CURR_LOG_SIZE	"\"logSizeMB\":"
+#define SHADOW_STATE_NULL "{\"state\":null}"
+#define SHADOW_REPORTED_START "{\"state\":{\"reported\":{"
+#define SHADOW_REPORTED_END "}}}"
+#define SHADOW_TEMPERATURE "\"temperature\":"
+#define SHADOW_HUMIDITY "\"humidity\":"
+#define SHADOW_PRESSURE "\"pressure\":"
+#define SHADOW_RADIO_RSSI "\"radio_rssi\":"
+#define SHADOW_RADIO_SINR "\"radio_sinr\":"
+#define SHADOW_TEMPERATURE "\"temperature\":"
+#define SHADOW_HUMIDITY "\"humidity\":"
+#define SHADOW_PRESSURE "\"pressure\":"
+#define SHADOW_RADIO_RSSI "\"radio_rssi\":"
+#define SHADOW_RADIO_SINR "\"radio_sinr\":"
+#define SHADOW_MG100_TEMP "\"tempC\":"
+#define SHADOW_MG100_BATT_LEVEL "\"batteryLevel\":"
+#define SHADOW_MG100_BATT_VOLT "\"batteryVoltageMv\":"
+#define SHADOW_MG100_PWR_STATE "\"powerState\":"
+#define SHADOW_MG100_BATT_LOW "\"batteryLowThreshold\":"
+#define SHADOW_MG100_BATT_0 "\"battery0\":"
+#define SHADOW_MG100_BATT_1 "\"battery1\":"
+#define SHADOW_MG100_BATT_2 "\"battery2\":"
+#define SHADOW_MG100_BATT_3 "\"battery3\":"
+#define SHADOW_MG100_BATT_4 "\"battery4\":"
+#define SHADOW_MG100_BATT_GOOD "\"batteryGood\":"
+#define SHADOW_MG100_BATT_BAD "\"batteryBadThreshold\":"
+#define SHADOW_MG100_ODR "\"odr\":"
+#define SHADOW_MG100_SCALE "\"scale\":"
+#define SHADOW_MG100_ACT_THS "\"activationThreshold\":"
+#define SHADOW_MG100_MOVEMENT "\"movement\":"
+#define SHADOW_MG100_MAX_LOG_SIZE "\"maxLogSizeMB\":"
+#define SHADOW_MG100_SDCARD_FREE "\"sdCardFreeMB\":"
+#define SHADOW_MG100_CURR_LOG_SIZE "\"logSizeMB\":"
 
 #define AWS_RX_THREAD_STACK_SIZE 4096
 #define AWS_RX_THREAD_PRIORITY K_PRIO_COOP(15)
@@ -174,9 +178,9 @@ int awsSetShadowAppFirmwareVersion(const char *version);
 int awsPublishBl654SensorData(float temperature, float humidity,
 			      float pressure);
 int awsPublishPinnacleData(int radioRssi, int radioSinr,
-										struct battery_data * battery,
-										struct motion_status * motion,
-										struct sdcard_status * sdcard);
+			   struct battery_data *battery,
+			   struct motion_status *motion,
+			   struct sdcard_status *sdcard);
 int awsSubscribe(uint8_t *topic, uint8_t subscribe);
 int awsGetShadow(void);
 int awsGetAcceptedSubscribe(void);

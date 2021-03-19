@@ -28,6 +28,7 @@ LOG_MODULE_REGISTER(main);
 #include <shell/shell.h>
 #include <shell/shell_uart.h>
 #include <string.h>
+#include <net/socket.h>
 
 #include "led_configuration.h"
 #include "lte.h"
@@ -179,6 +180,7 @@ static void appStateWaitFota(void);
 static void initializeCloudMsgReceiver(void);
 static void appStateWaitForLte(void);
 static void appStateStartup(void);
+static void appStateStartupAtt(void);
 static void appStateLteConnected(void);
 
 static void appSetNextState(app_state_function_t next);
@@ -235,16 +237,6 @@ void main(void)
 	}
 	lteInfo = lteGetStatus();
 
-	/* init AWS */
-#ifdef CONFIG_BLUEGRASS
-	rc = awsInit();
-	if (rc != 0) {
-		goto exit;
-	}
-
-	k_timer_init(&awsKeepAliveTimer, AwsKeepAliveTimerCallbackIsr, NULL);
-#endif
-
 	initializeCloudMsgReceiver();
 
 	initializeBle(lteInfo->IMEI);
@@ -297,19 +289,6 @@ void main(void)
 	mcumgr_wrapper_register_subsystems();
 #endif
 
-#ifdef CONFIG_BLUEGRASS
-	rc = aws_svc_init(lteInfo->IMEI);
-	if (rc != 0) {
-		goto exit;
-	}
-	aws_svc_set_event_callback(awsSvcEvent);
-	if (commissioned) {
-		aws_svc_set_status(NULL, AWS_STATUS_DISCONNECTED);
-	} else {
-		aws_svc_set_status(NULL, AWS_STATUS_NOT_PROVISIONED);
-	}
-#endif
-
 #ifdef CONFIG_LWM2M
 	ble_lwm2m_service_init();
 #endif
@@ -326,7 +305,8 @@ void main(void)
 	appReady = true;
 	printk("\n!!!!!!!! App is ready! !!!!!!!!\n");
 
-	appSetNextState(appStateStartup);
+	// appSetNextState(appStateStartup);
+	appSetNextState(appStateStartupAtt);
 
 	while (true) {
 		appState();
@@ -461,6 +441,17 @@ static void appStateStartup(void)
 #else
 	appSetNextState(appStateWaitForLte);
 #endif
+}
+
+static void appStateStartupAtt(void)
+{
+	if (!lteIsReady()) {
+		/* Wait for LTE ready evt */
+		k_sem_take(&lte_ready_sem, K_FOREVER);
+	} else {
+		/* Prepare for BLE function to receive adverts */
+		awsMsgHandler();
+	}
 }
 
 static void appStateWaitForLte(void)

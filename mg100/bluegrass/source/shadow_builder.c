@@ -228,6 +228,7 @@ void ShadowBuilder_StartGroup(JsonMsg_t *pJsonMsg, const char *restrict pKey)
 
 void ShadowBuilder_AttStartGroup(JsonMsg_t *pJsonMsg, const char *restrict pKey)
 {
+	LOG_DBG("ShadowBuilder_AttStartGroup");
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	FRAMEWORK_ASSERT(pKey != NULL);
 	FRAMEWORK_ASSERT(strlen(pKey) > 0);
@@ -248,6 +249,8 @@ void ShadowBuilder_EndGroup(JsonMsg_t *pJsonMsg)
 
 void ShadowBuilder_AttEndGroup(JsonMsg_t *pJsonMsg)
 {
+	LOG_DBG("ShadowBuilder_AttEndGroup");
+
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
 
@@ -345,6 +348,8 @@ void ShadowBuilder_AddString(JsonMsg_t *pJsonMsg, const char *restrict pKey,
 
 void ShadowBuilder_Addnewline(JsonMsg_t *pJsonMsg)
 {
+	LOG_DBG("ShadowBuilder_Addnewline");
+
 	FRAMEWORK_ASSERT(pJsonMsg != NULL);
 	//FRAMEWORK_ASSERT(pJsonMsg->buffer[pJsonMsg->length - 1] == ',');
 	//pJsonMsg->buffer[pJsonMsg->length - 1] = '\n';
