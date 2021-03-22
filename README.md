@@ -8,7 +8,6 @@
 4. **[Clone firmware source](#clone-firmware-source)**
 5. **[Build firmware](#build-firmware)**
 6. **[Update firmware](#update-firmware)**
-7. **[Connect to AWS account](#connect-to-aws-account)**
 8. **[Development](#development)**
 
 ## Introduction
@@ -129,11 +128,7 @@ If the firmware was built with mcuboot, `west flash` will program merged.hex whi
 ### Flash firmware via UART or BLE 
 
 See [here](docs/firmware_update.md) for building firmware via UART or BLE 
-
-
-## Connect to AWS account 
-
-Read [here](docs/aws_iot.md) where you will set up AWS account and set its address in MG100 so that you can see data coming in from either BT510 or Beckett device 
+ 
 
 ## Development
 
